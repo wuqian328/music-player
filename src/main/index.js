@@ -28,12 +28,6 @@ function initLogger() {
   ensureLogDir()
   const logPath = getLogPath()
   logStream = fs.createWriteStream(logPath, { flags: 'a', encoding: 'utf-8' })
-  
-  process.on('exit', () => {
-    if (logStream) {
-      logStream.end()
-    }
-  })
 }
 
 function getTimestamp() {
@@ -54,7 +48,7 @@ function log(level, message, data = null) {
   
   console.log(logLine)
   
-  if (logStream) {
+  if (logStream && !logStream.destroyed) {
     logStream.write(logLine + '\n')
   }
 }
@@ -994,20 +988,57 @@ ipcMain.handle('list-local-music', async (event, { customPath, page = 1, pageSiz
       return ''
     }
   })
+
+  ipcMain.handle('read-file-as-data-url', async (event, { filePath }) => {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: 'File not found' }
+      }
+      const data = fs.readFileSync(filePath)
+      const ext = path.extname(filePath).toLowerCase()
+      const mimeTypes = {
+        '.mp3': 'audio/mpeg',
+        '.flac': 'audio/flac',
+        '.wav': 'audio/wav',
+        '.m4a': 'audio/mp4',
+        '.aac': 'audio/aac',
+        '.ogg': 'audio/ogg',
+        '.wma': 'audio/x-ms-wma',
+        '.opus': 'audio/ogg',
+        '.ape': 'audio/ape',
+        '.wv': 'audio/wavpack',
+        '.aiff': 'audio/aiff'
+      }
+      const mimeType = mimeTypes[ext] || 'audio/mpeg'
+      return { success: true, dataUrl: `data:${mimeType};base64,${data.toString('base64')}` }
+    } catch (err) {
+      error(`Read file as data URL failed: ${err.message}`)
+      return { success: false, error: err.message }
+    }
+  })
 }
 
-protocol.handle('cache-file', (request) => {
-  const url = request.url.replace('cache-file://', '')
-  const filePath = decodeURIComponent(url)
-  try {
-    return net.fetch(`file://${filePath}`)
-  } catch (err) {
-    error(`Cache protocol error: ${err.message}`)
-    return new Response('File not found', { status: 404 })
-  }
-})
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'cache-file', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+])
 
 app.whenReady().then(() => {
+  protocol.handle('cache-file', (request) => {
+    const url = request.url.replace('cache-file://', '')
+    let filePath = decodeURIComponent(url)
+    // 将 Windows 反斜杠转为正斜杠，确保 file:// URL 格式正确
+    filePath = filePath.replace(/\\/g, '/')
+    // 确保以 / 开头
+    if (!filePath.startsWith('/')) {
+      filePath = '/' + filePath
+    }
+    try {
+      return net.fetch(`file://${filePath}`)
+    } catch (err) {
+      error(`Cache protocol error: ${err.message}`)
+      return new Response('File not found', { status: 404 })
+    }
+  })
   initLogger()
   info('=== Application Started ===')
   info(`Platform: ${process.platform}`)
@@ -1030,4 +1061,8 @@ app.on('window-all-closed', () => {
 
 app.on('quit', () => {
   info('=== Application Quit ===')
+  if (logStream && logStream.writable) {
+    logStream.end()
+    logStream = null
+  }
 })

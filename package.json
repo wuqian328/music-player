@@ -23,14 +23,14 @@
     "appId": "com.music-player.app",
     "productName": "音乐播放器",
     "directories": {
-      "output": "release"
+      "output": "dist"
     },
     "files": [
       "out/**/*"
     ],
     "win": {
       "target": [
-        "nsis"
+        "dir"
       ],
       "icon": null
     },
@@ -38,12 +38,6 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "your-github-username",
-      "repo": "music-player",
-      "releaseType": "release"
     }
   },
   "dependencies": {

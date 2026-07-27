@@ -262,7 +262,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (!settings.cacheEnabled || !url) return
     
     try {
-      const ext = getFileExtFromUrl(url)
+      const ext = getFileExtFromUrl(url) || 'mp3'
       const fileName = `${song.source}-${song.id}.${ext}`
       const meta = {
         id: song.id,
@@ -300,7 +300,11 @@ export const usePlayerStore = defineStore('player', () => {
       if (cachedRes.success && cachedRes.cached) {
         console.log('Loading music from cache:', cachedRes.musicPath)
         
-        const cacheUrl = window.electronAPI.getCacheFileUrl(cachedRes.musicPath)
+        const dataUrlRes = await window.electronAPI.readFileAsDataUrl(cachedRes.musicPath)
+        if (!dataUrlRes.success) {
+          console.error('Failed to read cached file as data URL:', dataUrlRes.error)
+          return { success: false, fromCache: false }
+        }
         
         const lyricFile = `${song.source}-${song.lyric_id || song.id}.lrc`
         const lyricRes = await window.electronAPI.readCachedFile({
@@ -320,12 +324,15 @@ export const usePlayerStore = defineStore('player', () => {
           type: 'albumart'
         })
         if (albumRes.success && albumRes.exists) {
-          albumArtUrl.value = window.electronAPI.getCacheFileUrl(albumRes.path)
+          const albumDataUrlRes = await window.electronAPI.readFileAsDataUrl(albumRes.path)
+          if (albumDataUrlRes.success) {
+            albumArtUrl.value = albumDataUrlRes.dataUrl
+          }
         }
         
         currentQuality.value = cachedRes.metadata.quality || ''
         
-        return { success: true, url: cacheUrl, fromCache: true }
+        return { success: true, url: dataUrlRes.dataUrl, fromCache: true }
       }
     } catch (e) {
       console.error('Load from cache failed:', e)
