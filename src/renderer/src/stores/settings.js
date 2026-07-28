@@ -34,7 +34,7 @@ function defaults() {
   return {
     playQuality: '320000',
     downloadQuality: '320000',
-    cacheEnabled: true,
+    cacheEnabled: false,
     cacheDirectory: '',
     autoCacheLyrics: true,
     autoCacheAlbumArt: true,

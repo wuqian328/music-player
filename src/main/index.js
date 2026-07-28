@@ -480,12 +480,12 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('get-cached-song', async (event, { id, source, customPath }) => {
+  ipcMain.handle('get-cached-song', async (event, { fileName, customPath }) => {
     try {
       const cacheDir = customPath || getDefaultCacheDir()
       const musicDir = join(cacheDir, 'music')
       
-      debug(`Checking cached song: ${source}-${id}`)
+      debug(`Checking cached song: ${fileName}`)
       debug(`Cache directory: ${musicDir}`)
       
       if (!fs.existsSync(musicDir)) {
@@ -496,14 +496,14 @@ function registerIpcHandlers() {
       const files = fs.readdirSync(musicDir)
       debug(`Files in music dir: ${files.join(', ')}`)
       
-      const musicFile = files.find(f => f.startsWith(`${source}-${id}.`))
+      const musicFile = files.find(f => f.startsWith(`${fileName}.`) && !f.endsWith('.json'))
       debug(`Found music file: ${musicFile || 'none'}`)
       
       if (!musicFile) {
         return { success: true, cached: false }
       }
       
-      const jsonFile = files.find(f => f === `${source}-${id}.json`)
+      const jsonFile = files.find(f => f === `${fileName}.json`)
       debug(`Found json file: ${jsonFile || 'none'}`)
       
       if (!jsonFile) {

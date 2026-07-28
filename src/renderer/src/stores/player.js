@@ -211,12 +211,25 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // 清理文件名中的非法字符，生成可用于文件名的安全字符串
+  function sanitizeFileName(str) {
+    if (!str) return ''
+    return str.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim()
+  }
+
+  // 生成"歌名-歌手"格式的缓存文件名基础部分
+  function getCacheBaseName(song) {
+    const name = sanitizeFileName(song.name || '')
+    const artist = sanitizeFileName(song.artist || '')
+    return `${name}-${artist}`
+  }
+
   async function cacheLyric(song, lyricText) {
     const settings = useSettingsStore()
     if (!settings.cacheEnabled || !settings.autoCacheLyrics || !lyricText) return
     
     try {
-      const fileName = `${song.source}-${song.lyric_id || song.id}.lrc`
+      const fileName = `${getCacheBaseName(song)}.lrc`
       await window.electronAPI.cacheFile({
         fileName,
         customPath: settings.cacheDirectory,
@@ -245,7 +258,7 @@ export const usePlayerStore = defineStore('player', () => {
     
     try {
       const ext = getFileExtFromUrl(url)
-      const fileName = `${song.source}-${song.pic_id || song.id}.${ext}`
+      const fileName = `${getCacheBaseName(song)}.${ext}`
       await window.electronAPI.cacheFile({
         url,
         fileName,
@@ -263,7 +276,7 @@ export const usePlayerStore = defineStore('player', () => {
     
     try {
       const ext = getFileExtFromUrl(url) || 'mp3'
-      const fileName = `${song.source}-${song.id}.${ext}`
+      const fileName = `${getCacheBaseName(song)}.${ext}`
       const meta = {
         id: song.id,
         source: song.source,
@@ -291,9 +304,9 @@ export const usePlayerStore = defineStore('player', () => {
   async function loadFromCache(song) {
     const settings = useSettingsStore()
     try {
+      const baseName = getCacheBaseName(song)
       const cachedRes = await window.electronAPI.getCachedSong({
-        id: song.id,
-        source: song.source,
+        fileName: baseName,
         customPath: settings.cacheDirectory
       })
       
@@ -306,7 +319,7 @@ export const usePlayerStore = defineStore('player', () => {
           return { success: false, fromCache: false }
         }
         
-        const lyricFile = `${song.source}-${song.lyric_id || song.id}.lrc`
+        const lyricFile = `${baseName}.lrc`
         const lyricRes = await window.electronAPI.readCachedFile({
           fileName: lyricFile,
           customPath: settings.cacheDirectory,
@@ -317,7 +330,7 @@ export const usePlayerStore = defineStore('player', () => {
         }
         
         const albumExt = cachedRes.metadata.pic_ext || 'jpg'
-        const albumFile = `${song.source}-${song.pic_id || song.id}.${albumExt}`
+        const albumFile = `${baseName}.${albumExt}`
         const albumRes = await window.electronAPI.getCachedFile({
           fileName: albumFile,
           customPath: settings.cacheDirectory,
